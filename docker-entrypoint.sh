@@ -23,22 +23,8 @@ else
   echo "DATABASE_URL is not set or could not be parsed; skipping DB wait"
 fi
 
-rm -f /tmp/migrations_done
-
-# Start the application first
-echo "Starting the application..."
-"$@" &
-APP_PID=$!
-
-# Apply database migrations in background of the running app startup
 echo "Applying database migrations..."
-if npx prisma migrate deploy; then
-  touch /tmp/migrations_done
-  echo "Migrations applied"
-else
-  echo "Migrations failed"
-  kill "$APP_PID" 2>/dev/null || true
-  exit 1
-fi
+npx prisma migrate deploy
 
-wait "$APP_PID"
+echo "Starting the application..."
+exec "$@"
