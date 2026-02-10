@@ -6,7 +6,7 @@ import * as dotenv from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-  dotenv.config({ path: '.env.local' });
+  dotenv.config({ path: '.env' });
   const app = await NestFactory.create(AppModule);
 
   app.useGlobalInterceptors(new LoggingInterceptor());

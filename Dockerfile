@@ -22,8 +22,8 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install netcat for health check
-RUN apk add --no-cache netcat-openbsd
+# Install tools used by entrypoint + healthcheck
+RUN apk add --no-cache netcat-openbsd curl
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
@@ -33,5 +33,9 @@ COPY --from=build /app/prisma ./prisma
 COPY docker-entrypoint.sh /usr/local/bin/
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=10 \
+  CMD curl -fsS http://localhost:3000/v1/health || exit 1
+
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/main"]
