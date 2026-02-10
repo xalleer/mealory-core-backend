@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 # Wait for database to be ready
 echo "Waiting for database to be ready..."
 
@@ -21,10 +23,22 @@ else
   echo "DATABASE_URL is not set or could not be parsed; skipping DB wait"
 fi
 
-# Apply database migrations
-echo "Applying database migrations..."
-npx prisma migrate deploy
+rm -f /tmp/migrations_done
 
-# Start the application
+# Start the application first
 echo "Starting the application..."
-exec "$@"
+"$@" &
+APP_PID=$!
+
+# Apply database migrations in background of the running app startup
+echo "Applying database migrations..."
+if npx prisma migrate deploy; then
+  touch /tmp/migrations_done
+  echo "Migrations applied"
+else
+  echo "Migrations failed"
+  kill "$APP_PID" 2>/dev/null || true
+  exit 1
+fi
+
+wait "$APP_PID"
