@@ -11,3 +11,86 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Goal {
+  weight_loss
+  weight_gain
+  healthy_eating
+  maintain_weight
+}
+
+enum AuthProvider {
+  local
+  google
+  apple
+}
+
+model User {
+  id                String       @id @default(uuid()) @db.Uuid
+  email             String       @unique
+  password          String?
+  name              String
+  height            Int?
+  weight            Int?
+  goal              Goal?
+  isFamilyHead      Boolean      @default(false) @map("is_family_head")
+  familyId          String?      @db.Uuid @map("family_id")
+  familyMemberId    String?      @unique @db.Uuid @map("family_member_id")
+  authProvider      AuthProvider @default(local) @map("auth_provider")
+  refreshTokenHash  String?      @map("refresh_token_hash")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  family            Family?      @relation("FamilyUsers", fields: [familyId], references: [id])
+  familyMember      FamilyMember? @relation("UserFamilyMember", fields: [familyMemberId], references: [id])
+  registeredFamilyMember FamilyMember? @relation("FamilyMemberUser")
+  createdFamilies   Family[]     @relation("FamilyCreatedBy")
+
+  @@map("users")
+}
+
+model Family {
+  id                String       @id @default(uuid()) @db.Uuid
+  weeklyBudget      Decimal?     @db.Decimal(12, 2) @map("weekly_budget")
+  budgetUsed        Decimal      @default(0) @db.Decimal(12, 2) @map("budget_used")
+  budgetPeriodStart DateTime?    @db.Date @map("budget_period_start")
+  budgetPeriodEnd   DateTime?    @db.Date @map("budget_period_end")
+  createdById       String       @db.Uuid @map("created_by")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  createdBy         User         @relation("FamilyCreatedBy", fields: [createdById], references: [id])
+  users             User[]       @relation("FamilyUsers")
+  members           FamilyMember[]
+
+  @@map("families")
+}
+
+model FamilyMember {
+  id           String   @id @default(uuid()) @db.Uuid
+  familyId     String   @db.Uuid @map("family_id")
+  name         String
+  userId       String?  @unique @db.Uuid @map("user_id")
+  inviteToken  String   @unique @default(uuid()) @db.Uuid @map("invite_token")
+  mealTimes    Json?    @map("meal_times")
+  allergies    Json?    @map("allergies")
+  isRegistered Boolean  @default(false) @map("is_registered")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  family       Family   @relation(fields: [familyId], references: [id])
+  user         User?    @relation("FamilyMemberUser", fields: [userId], references: [id])
+  invitedUsers User[]   @relation("UserFamilyMember")
+
+  @@map("family_members")
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String
+  otpCode   String   @map("otp_code")
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+
+  @@map("password_resets")
+}
