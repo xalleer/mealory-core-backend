@@ -1,24 +1,4 @@
 services:
-  api:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    command: npm run start:dev
-    environment:
-      PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/mealory_local
-      DATABASE_TEST_URL: postgresql://postgres:postgres@test-db:5432/mealory_test
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./:/app
-      - /app/node_modules
-    depends_on:
-      db:
-        condition: service_healthy
-      test-db:
-        condition: service_healthy
-
   db:
     image: postgres:16-alpine
     environment:
@@ -26,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: mealory_local
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - mealory_local_db:/var/lib/postgresql/data
     healthcheck:
