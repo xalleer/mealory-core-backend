@@ -7,7 +7,6 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { hash, compare } from 'bcrypt';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,6 +14,8 @@ import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { EmailService } from './email.service';
 import type { AuthProviderType, GoalType, OAuthUser } from './auth.types';
+import { randomUUID } from 'crypto';
+import { RegisterViaInviteDto } from './dto/register-via-invite.dto';
 
 type UserLike = {
   id: string;
@@ -232,51 +233,66 @@ export class AuthService {
     };
   }
 
-  async joinFamily(userId: string, inviteToken: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
+  async registerViaInvite(inviteToken: string, dto: RegisterViaInviteDto) {
     const member = await this.prisma.familyMember.findUnique({
       where: { inviteToken },
+      include: { family: true },
     });
+
     if (!member) {
       throw new BadRequestException('Invalid invite token');
     }
-    if (member.userId) {
+
+    if (member.isRegistered && member.userId) {
       throw new BadRequestException('Invite already used');
     }
-    if (user.familyId && user.familyId !== member.familyId) {
-      throw new BadRequestException('User already in family');
-    }
-    if (user.familyMemberId) {
-      throw new BadRequestException('User already joined a family');
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+    });
+    if (existing) {
+      throw new BadRequestException('Email already in use');
     }
 
-    const updatedUser = await this.prisma.$transaction(async tx => {
+    const passwordHash = await hash(dto.password, 10);
+
+    const user = await this.prisma.$transaction(async tx => {
+      const newUser = await tx.user.create({
+        data: {
+          email: dto.email.toLowerCase(),
+          password: passwordHash,
+          name: member.name,
+          height: dto.height,
+          weight: dto.weight,
+          goal: dto.goal,
+          authProvider: 'local',
+          isFamilyHead: false,
+          familyId: member.familyId,
+          familyMemberId: member.id,
+        },
+      });
+
       await tx.familyMember.update({
         where: { id: member.id },
         data: {
-          userId: user.id,
+          userId: newUser.id,
           isRegistered: true,
           inviteToken: randomUUID(),
+          ...(dto.mealTimes ? { mealTimes: dto.mealTimes } : {}),
+          ...(dto.allergies ? { allergies: dto.allergies } : {}),
         },
       });
 
-      return await tx.user.update({
-        where: { id: user.id },
-        data: {
-          familyId: member.familyId,
-          familyMemberId: member.id,
-          isFamilyHead: false,
-        },
-      });
+      return newUser;
     });
 
+    const accessToken = await this.issueAccessToken(user.id, user.email);
+
     return {
-      user: this.sanitizeUser(updatedUser),
-      ok: true,
+      user: this.sanitizeUser(user),
+      accessToken,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      needsOnboarding: false,
     };
   }
 

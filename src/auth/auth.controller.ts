@@ -22,14 +22,11 @@ import { RegisterDto } from './dto/register.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
-import {
-  AuthResponseDto,
-  SuccessResponseDto,
-  JoinFamilyResponseDto,
-} from './dto/auth-response.dto';
+import { AuthResponseDto, SuccessResponseDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthGuard } from '@nestjs/passport';
 import type { OAuthUser } from './auth.types';
+import { RegisterViaInviteDto } from './dto/register-via-invite.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -108,16 +105,13 @@ export class AuthController {
     return this.authService.completeProfile(userId, dto);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @ApiOkResponse({ type: JoinFamilyResponseDto })
+  @ApiOkResponse({ type: AuthResponseDto })
   @HttpCode(HttpStatus.OK)
-  @Post('join-family/:inviteToken')
-  async joinFamily(
-    @Req() req: Request,
+  @Post('register-via-invite/:inviteToken')
+  async registerViaInvite(
     @Param('inviteToken') inviteToken: string,
+    @Body() dto: RegisterViaInviteDto,
   ) {
-    const userId = (req.user as { sub: string }).sub;
-    return this.authService.joinFamily(userId, inviteToken);
+    return this.authService.registerViaInvite(inviteToken, dto);
   }
 }
