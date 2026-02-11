@@ -6,10 +6,13 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { hash, compare } from 'bcrypt';
+import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { EmailService } from './email.service';
 import type { AuthProviderType, GoalType, OAuthUser } from './auth.types';
 
@@ -53,24 +56,227 @@ export class AuthService {
 
     const goal: GoalType | null = dto.goal ?? null;
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email.toLowerCase(),
-        password: passwordHash,
-        name: dto.name,
-        height: dto.height ?? null,
-        weight: dto.weight ?? null,
-        goal,
-        authProvider: 'local',
-      },
+    const { start: budgetPeriodStart, end: budgetPeriodEnd } =
+      this.getCurrentWeekPeriod();
+
+    const normalizedEmail = dto.email.toLowerCase();
+
+    const user = await this.prisma.$transaction(async tx => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          password: passwordHash,
+          name: dto.name,
+          height: dto.height ?? null,
+          weight: dto.weight ?? null,
+          goal,
+          authProvider: 'local',
+          isFamilyHead: true,
+        },
+      });
+
+      const family = await tx.family.create({
+        data: {
+          createdById: createdUser.id,
+          weeklyBudget:
+            dto.weeklyBudget != null
+              ? new Prisma.Decimal(dto.weeklyBudget)
+              : null,
+          budgetPeriodStart,
+          budgetPeriodEnd,
+        },
+      });
+
+      const selfFamilyMember = await tx.familyMember.create({
+        data: {
+          familyId: family.id,
+          name: createdUser.name,
+          userId: createdUser.id,
+          isRegistered: true,
+          mealTimes: dto.mealTimes,
+          allergies: dto.allergies,
+        },
+      });
+
+      if (dto.familyMembers?.length) {
+        await tx.familyMember.createMany({
+          data: dto.familyMembers.map(m => ({
+            familyId: family.id,
+            name: m.name,
+            ...(m.mealTimes ? { mealTimes: m.mealTimes } : {}),
+            ...(m.allergies ? { allergies: m.allergies } : {}),
+          })),
+        });
+      }
+
+      return await tx.user.update({
+        where: { id: createdUser.id },
+        data: {
+          familyId: family.id,
+          familyMemberId: selfFamilyMember.id,
+        },
+      });
     });
 
     const accessToken = await this.issueAccessToken(user.id, user.email);
+
+    const needsOnboarding =
+      user.height == null ||
+      user.weight == null ||
+      user.goal == null ||
+      user.familyId == null ||
+      user.familyMemberId == null;
 
     return {
       user: this.sanitizeUser(user),
       accessToken,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      needsOnboarding,
+    };
+  }
+
+  async completeProfile(userId: string, dto: CompleteProfileDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const { start: budgetPeriodStart, end: budgetPeriodEnd } =
+      this.getCurrentWeekPeriod();
+
+    const updatedUser = await this.prisma.$transaction(async tx => {
+      const familyId = user.familyId
+        ? user.familyId
+        : (
+            await tx.family.create({
+              data: {
+                createdById: user.id,
+                weeklyBudget:
+                  dto.weeklyBudget != null
+                    ? new Prisma.Decimal(dto.weeklyBudget)
+                    : null,
+                budgetPeriodStart,
+                budgetPeriodEnd,
+              },
+            })
+          ).id;
+
+      if (dto.weeklyBudget != null) {
+        await tx.family.update({
+          where: { id: familyId },
+          data: {
+            weeklyBudget: new Prisma.Decimal(dto.weeklyBudget),
+            budgetPeriodStart,
+            budgetPeriodEnd,
+          },
+        });
+      }
+
+      const familyMemberId = user.familyMemberId
+        ? user.familyMemberId
+        : (
+            await tx.familyMember.create({
+              data: {
+                familyId,
+                name: user.name,
+                userId: user.id,
+                isRegistered: true,
+                mealTimes: dto.mealTimes,
+                allergies: dto.allergies,
+              },
+            })
+          ).id;
+
+      await tx.familyMember.update({
+        where: { id: familyMemberId },
+        data: {
+          mealTimes: dto.mealTimes,
+          allergies: dto.allergies,
+        },
+      });
+
+      if (dto.familyMembers?.length) {
+        await tx.familyMember.createMany({
+          data: dto.familyMembers.map(m => ({
+            familyId,
+            name: m.name,
+            ...(m.mealTimes ? { mealTimes: m.mealTimes } : {}),
+            ...(m.allergies ? { allergies: m.allergies } : {}),
+          })),
+        });
+      }
+
+      return await tx.user.update({
+        where: { id: user.id },
+        data: {
+          height: dto.height,
+          weight: dto.weight,
+          goal: dto.goal,
+          isFamilyHead: true,
+          familyId,
+          familyMemberId,
+        },
+      });
+    });
+
+    const accessToken = await this.issueAccessToken(
+      updatedUser.id,
+      updatedUser.email,
+    );
+
+    return {
+      user: this.sanitizeUser(updatedUser),
+      accessToken,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      needsOnboarding: false,
+    };
+  }
+
+  async joinFamily(userId: string, inviteToken: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const member = await this.prisma.familyMember.findUnique({
+      where: { inviteToken },
+    });
+    if (!member) {
+      throw new BadRequestException('Invalid invite token');
+    }
+    if (member.userId) {
+      throw new BadRequestException('Invite already used');
+    }
+    if (user.familyId && user.familyId !== member.familyId) {
+      throw new BadRequestException('User already in family');
+    }
+    if (user.familyMemberId) {
+      throw new BadRequestException('User already joined a family');
+    }
+
+    const updatedUser = await this.prisma.$transaction(async tx => {
+      await tx.familyMember.update({
+        where: { id: member.id },
+        data: {
+          userId: user.id,
+          isRegistered: true,
+          inviteToken: randomUUID(),
+        },
+      });
+
+      return await tx.user.update({
+        where: { id: user.id },
+        data: {
+          familyId: member.familyId,
+          familyMemberId: member.id,
+          isFamilyHead: false,
+        },
+      });
+    });
+
+    return {
+      user: this.sanitizeUser(updatedUser),
+      ok: true,
     };
   }
 
@@ -216,6 +422,21 @@ export class AuthService {
   private generateOtp() {
     const code = Math.floor(100000 + Math.random() * 900000);
     return String(code);
+  }
+
+  private getCurrentWeekPeriod() {
+    const now = new Date();
+    const day = now.getDay();
+    const daysFromMonday = (day + 6) % 7;
+    const start = new Date(now);
+    start.setDate(now.getDate() - daysFromMonday);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    end.setHours(0, 0, 0, 0);
+
+    return { start, end };
   }
 
   private sanitizeUser(user: UserLike) {

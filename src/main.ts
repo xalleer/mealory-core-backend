@@ -16,17 +16,21 @@ async function bootstrap() {
       transform: true,
     }),
   );
-
-  app.setGlobalPrefix('v1');
-
   const config = new DocumentBuilder()
     .setTitle('Mealory Core API')
-    .setDescription('API documentation')
+    .setDescription('API documentation for Mealory Core Backend')
     .setVersion('0.0.1')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('v1/api', app, document);
+  SwaggerModule.setup('swagger', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      defaultModelsExpandDepth: 2,
+      defaultModelExpandDepth: 2,
+    },
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

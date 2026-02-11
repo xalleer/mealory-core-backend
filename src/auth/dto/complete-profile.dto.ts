@@ -1,14 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
-  IsEmail,
   IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  MinLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -16,7 +14,7 @@ import { Type } from 'class-transformer';
 import type { AllergyType, GoalType, MealTimeType } from '../auth.types';
 import { ALLERGY_VALUES, GOAL_VALUES, MEAL_TIME_VALUES } from '../auth.types';
 
-class RegisterFamilyMemberDto {
+class CompleteProfileFamilyMemberDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -35,38 +33,20 @@ class RegisterFamilyMemberDto {
   allergies?: AllergyType[];
 }
 
-export class RegisterDto {
+export class CompleteProfileDto {
   @ApiProperty()
-  @IsEmail()
-  email!: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(6)
-  password!: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  name!: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
   @IsInt()
   @Min(0)
-  height?: number;
+  height!: number;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
+  @ApiProperty()
   @IsInt()
   @Min(0)
-  weight?: number;
+  weight!: number;
 
-  @ApiProperty({ enum: GOAL_VALUES, required: false })
-  @IsOptional()
+  @ApiProperty({ enum: GOAL_VALUES })
   @IsIn(GOAL_VALUES)
-  goal?: GoalType;
+  goal!: GoalType;
 
   @ApiProperty({ enum: MEAL_TIME_VALUES, isArray: true })
   @IsArray()
@@ -84,10 +64,10 @@ export class RegisterDto {
   @Min(0)
   weeklyBudget?: number;
 
-  @ApiProperty({ required: false, type: [RegisterFamilyMemberDto] })
+  @ApiProperty({ required: false, type: [CompleteProfileFamilyMemberDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => RegisterFamilyMemberDto)
-  familyMembers?: RegisterFamilyMemberDto[];
+  @Type(() => CompleteProfileFamilyMemberDto)
+  familyMembers?: CompleteProfileFamilyMemberDto[];
 }
