@@ -36,7 +36,7 @@ COPY docker-entrypoint.sh /usr/local/bin/
 EXPOSE 3000
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=10 \
-  CMD curl -fsS http://localhost:3000/v1/health || exit 1
+  CMD curl -fsS http://localhost:3000/health || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/main"]
