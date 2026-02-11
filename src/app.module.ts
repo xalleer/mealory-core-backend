@@ -8,6 +8,7 @@ import { FamiliesModule } from './families/families.module';
 import { ProductsModule } from './products/products.module';
 import { MenuModule } from './menu/menu.module';
 import { ShoppingListModule } from './shopping-list/shopping-list.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ShoppingListModule } from './shopping-list/shopping-list.module';
     ProductsModule,
     MenuModule,
     ShoppingListModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
