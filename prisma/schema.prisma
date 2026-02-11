@@ -25,6 +25,35 @@ enum AuthProvider {
   apple
 }
 
+enum ProductCategory {
+  meat
+  poultry
+  fish
+  dairy
+  eggs
+  vegetables
+  fruits
+  grains
+  pasta
+  bakery
+  oils
+  spices
+  sweets
+  beverages
+  canned
+  frozen
+  nuts
+  other
+}
+
+enum MeasurementUnit {
+  kg
+  g
+  l
+  ml
+  piece
+}
+
 model User {
   id                String       @id @default(uuid()) @db.Uuid
   email             String       @unique
@@ -93,4 +122,26 @@ model PasswordReset {
   isUsed    Boolean  @default(false) @map("is_used")
 
   @@map("password_resets")
+}
+
+model Product {
+  id                 String            @id @default(uuid()) @db.Uuid
+  name               String
+  nameEn             String?           @map("name_en")
+  category           ProductCategory
+  averagePrice       Decimal           @db.Decimal(10, 2) @map("average_price")
+  priceHistory       Json              @map("price_history")
+  baseUnit           MeasurementUnit   @map("base_unit")
+  standardPackaging  Decimal?          @db.Decimal(10, 3) @map("standard_packaging")
+  calories           Int?
+  protein            Decimal?          @db.Decimal(6, 2)
+  fats               Decimal?          @db.Decimal(6, 2)
+  carbs              Decimal?          @db.Decimal(6, 2)
+  allergens          Json
+  imageUrl           String?           @map("image_url")
+  isActive           Boolean           @default(true) @map("is_active")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  @@map("products")
 }

@@ -16,7 +16,10 @@ export class UserResponseDto {
   @ApiProperty({ required: false })
   weight?: number | null;
 
-  @ApiProperty({ required: false, enum: ['WEIGHT_LOSS', 'MUSCLE_GAIN', 'MAINTENANCE'] })
+  @ApiProperty({
+    required: false,
+    enum: ['WEIGHT_LOSS', 'MUSCLE_GAIN', 'MAINTENANCE'],
+  })
   goal?: 'WEIGHT_LOSS' | 'MUSCLE_GAIN' | 'MAINTENANCE' | null;
 
   @ApiProperty()
