@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import type { GenerateMenuDto } from './dto/generate-menu.dto';
 import type { RegenerateMenuDto } from './dto/regenerate-menu.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { ShoppingListService } from '../shopping-list/shopping-list.service';
 import {
   OpenAiService,
   type OpenAiMeal,
@@ -37,6 +38,7 @@ export class MenuService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly openAiService: OpenAiService,
+    private readonly shoppingListService: ShoppingListService,
   ) {}
 
   async generateMenu(userId: string, dto: GenerateMenuDto) {
@@ -79,7 +81,7 @@ export class MenuService {
       products,
     });
 
-    return this.prisma.$transaction(async tx => {
+    const menu = await this.prisma.$transaction(async tx => {
       await tx.menu.updateMany({
         where: { familyId: family.id, isActive: true },
         data: { isActive: false },
@@ -90,6 +92,10 @@ export class MenuService {
         include: this.menuInclude,
       });
     });
+
+    await this.shoppingListService.generateFromMenu(userId, menu.id);
+
+    return menu;
   }
 
   async regenerateMenu(userId: string, menuId: string, dto: RegenerateMenuDto) {

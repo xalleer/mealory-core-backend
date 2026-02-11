@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { FamiliesModule } from './families/families.module';
 import { ProductsModule } from './products/products.module';
 import { MenuModule } from './menu/menu.module';
+import { ShoppingListModule } from './shopping-list/shopping-list.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MenuModule } from './menu/menu.module';
     FamiliesModule,
     ProductsModule,
     MenuModule,
+    ShoppingListModule,
   ],
   controllers: [AppController],
   providers: [AppService],

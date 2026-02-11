@@ -54,6 +54,12 @@ enum MeasurementUnit {
   piece
 }
 
+enum ShoppingListStatus {
+  pending
+  in_progress
+  completed
+}
+
 model User {
   id                String       @id @default(uuid()) @db.Uuid
   email             String       @unique
@@ -74,6 +80,7 @@ model User {
   familyMember      FamilyMember? @relation("UserFamilyMember", fields: [familyMemberId], references: [id])
   registeredFamilyMember FamilyMember? @relation("FamilyMemberUser")
   createdFamilies   Family[]     @relation("FamilyCreatedBy")
+  inventoryItems    Inventory[]
 
   @@map("users")
 }
@@ -92,6 +99,8 @@ model Family {
   users             User[]       @relation("FamilyUsers")
   members           FamilyMember[]
   menus             Menu[]
+  shoppingLists     ShoppingList[]
+  inventory         Inventory[]
 
   @@map("families")
 }
@@ -146,6 +155,8 @@ model Product {
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
   recipeIngredients  RecipeIngredient[]
+  shoppingListItems  ShoppingListItem[]
+  inventoryItems     Inventory[]
 
   @@map("products")
 }
@@ -161,6 +172,7 @@ model Menu {
 
   family      Family   @relation(fields: [familyId], references: [id])
   days        Day[]
+  shoppingLists ShoppingList[]
 
   @@map("menus")
 }
@@ -247,4 +259,57 @@ model RecipeIngredient {
   product    Product  @relation(fields: [productId], references: [id])
 
   @@map("recipe_ingredients")
+}
+
+model ShoppingList {
+  id          String              @id @default(uuid()) @db.Uuid
+  menuId      String              @db.Uuid @map("menu_id")
+  familyId    String              @db.Uuid @map("family_id")
+  status      ShoppingListStatus  @default(pending)
+  totalPrice  Decimal             @default(0) @db.Decimal(12, 2) @map("total_price")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  menu        Menu                @relation(fields: [menuId], references: [id])
+  family      Family              @relation(fields: [familyId], references: [id])
+  items       ShoppingListItem[]
+
+  @@map("shopping_lists")
+}
+
+model ShoppingListItem {
+  id              String        @id @default(uuid()) @db.Uuid
+  shoppingListId  String        @db.Uuid @map("shopping_list_id")
+  productId       String        @db.Uuid @map("product_id")
+  quantity        Decimal       @db.Decimal(10, 3)
+  unit            MeasurementUnit
+  estimatedPrice  Decimal       @db.Decimal(10, 2) @map("estimated_price")
+  actualPrice     Decimal?      @db.Decimal(10, 2) @map("actual_price")
+  actualQuantity  Decimal?      @db.Decimal(10, 3) @map("actual_quantity")
+  isPurchased     Boolean       @default(false) @map("is_purchased")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  shoppingList    ShoppingList  @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id])
+
+  @@map("shopping_list_items")
+}
+
+model Inventory {
+  id              String           @id @default(uuid()) @db.Uuid
+  familyId        String           @db.Uuid @map("family_id")
+  productId       String           @db.Uuid @map("product_id")
+  quantity        Decimal          @db.Decimal(10, 3)
+  unit            MeasurementUnit
+  addedById       String           @db.Uuid @map("added_by")
+  expiryDate      DateTime?        @db.Date @map("expiry_date")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  family          Family           @relation(fields: [familyId], references: [id])
+  product         Product          @relation(fields: [productId], references: [id])
+  addedBy         User             @relation(fields: [addedById], references: [id])
+
+  @@map("inventory")
 }
