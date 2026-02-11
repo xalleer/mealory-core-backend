@@ -15,17 +15,66 @@ export class EmailService {
       : undefined,
   });
 
-  async sendPasswordResetOtp(email: string, otp: string) {
+  private getFrom() {
     const from = process.env.SMTP_FROM;
     if (!from) {
       throw new Error('SMTP_FROM is not set');
     }
+    return from;
+  }
+
+  async sendPasswordResetOtp(email: string, otp: string) {
+    const from = this.getFrom();
 
     await this.transporter.sendMail({
       from,
       to: email,
       subject: 'Password reset code',
       text: `Your password reset code is: ${otp}. It expires in 10 minutes.`,
+    });
+  }
+
+  async sendEmailChangedOld(oldEmail: string, newEmail: string) {
+    const from = this.getFrom();
+
+    await this.transporter.sendMail({
+      from,
+      to: oldEmail,
+      subject: 'Email changed',
+      text: `Your email was changed to ${newEmail}`,
+    });
+  }
+
+  async sendEmailChangedNew(newEmail: string) {
+    const from = this.getFrom();
+
+    await this.transporter.sendMail({
+      from,
+      to: newEmail,
+      subject: 'Email updated',
+      text: 'Your email was successfully updated',
+    });
+  }
+
+  async sendPasswordChanged(email: string) {
+    const from = this.getFrom();
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Password changed',
+      text: 'Your password was successfully changed',
+    });
+  }
+
+  async sendAccountDeleted(email: string) {
+    const from = this.getFrom();
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Account deleted',
+      text: "Your account has been deleted. We're sad to see you go.",
     });
   }
 
@@ -38,10 +87,7 @@ export class EmailService {
     priority: string;
     message: string;
   }) {
-    const from = process.env.SMTP_FROM;
-    if (!from) {
-      throw new Error('SMTP_FROM is not set');
-    }
+    const from = this.getFrom();
 
     await this.transporter.sendMail({
       from,
