@@ -28,4 +28,32 @@ export class EmailService {
       text: `Your password reset code is: ${otp}. It expires in 10 minutes.`,
     });
   }
+
+  async sendSupportTicketNotification(params: {
+    to: string;
+    userEmail: string;
+    userName: string;
+    ticketId: string;
+    subject: string;
+    priority: string;
+    message: string;
+  }) {
+    const from = process.env.SMTP_FROM;
+    if (!from) {
+      throw new Error('SMTP_FROM is not set');
+    }
+
+    await this.transporter.sendMail({
+      from,
+      to: params.to,
+      subject: `Support ticket: ${params.subject} [${params.priority}]`,
+      text: [
+        `Ticket ID: ${params.ticketId}`,
+        `User: ${params.userName} <${params.userEmail}>`,
+        `Priority: ${params.priority}`,
+        '',
+        params.message,
+      ].join('\n'),
+    });
+  }
 }

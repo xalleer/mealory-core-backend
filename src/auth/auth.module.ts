@@ -19,6 +19,6 @@ import { AppleStrategy } from './strategies/apple.strategy';
     GoogleStrategy,
     AppleStrategy,
   ],
-  exports: [AuthService],
+  exports: [AuthService, EmailService],
 })
 export class AuthModule {}

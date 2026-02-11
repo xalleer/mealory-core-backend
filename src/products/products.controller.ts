@@ -9,8 +9,10 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiQuery,
@@ -38,6 +40,8 @@ import {
   PRODUCT_CATEGORY_VALUES,
   PRODUCT_SORT_BY_VALUES,
 } from './products.types';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../admin/guards/admin.guard';
 import type {
   ProductCategoryType,
   ProductSortByType,
@@ -102,6 +106,8 @@ class ProductsQueryDto {
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiCreatedResponse({ type: ProductResponseDto })
   @Post()
   async create(@Body() dto: CreateProductDto) {
@@ -131,6 +137,8 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiOkResponse({ type: ProductResponseDto })
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
@@ -143,6 +151,8 @@ export class ProductsController {
     return this.productsService.updatePrice(id, dto);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiOkResponse({ type: ProductResponseDto })
   @HttpCode(HttpStatus.OK)
   @Delete(':id')

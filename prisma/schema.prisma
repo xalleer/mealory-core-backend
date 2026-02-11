@@ -25,6 +25,32 @@ enum AuthProvider {
   apple
 }
 
+enum UserRole {
+  user
+  admin
+  super_admin
+}
+
+enum SubscriptionTier {
+  free
+  pro
+  family_pro
+}
+
+enum SupportTicketStatus {
+  pending
+  in_progress
+  resolved
+  closed
+}
+
+enum SupportTicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
 enum ProductCategory {
   meat
   poultry
@@ -72,6 +98,10 @@ model User {
   familyId          String?      @db.Uuid @map("family_id")
   familyMemberId    String?      @unique @db.Uuid @map("family_member_id")
   authProvider      AuthProvider @default(local) @map("auth_provider")
+  role                UserRole          @default(user) @map("role")
+  subscriptionTier    SubscriptionTier  @default(free) @map("subscription_tier")
+  trialEndsAt         DateTime?         @map("trial_ends_at")
+  subscriptionExpiresAt DateTime?       @map("subscription_expires_at")
   refreshTokenHash  String?      @map("refresh_token_hash")
   createdAt         DateTime     @default(now()) @map("created_at")
   updatedAt         DateTime     @updatedAt @map("updated_at")
@@ -81,8 +111,25 @@ model User {
   registeredFamilyMember FamilyMember? @relation("FamilyMemberUser")
   createdFamilies   Family[]     @relation("FamilyCreatedBy")
   inventoryItems    Inventory[]
+  supportTickets     SupportTicket[]
 
   @@map("users")
+}
+
+model SupportTicket {
+  id         String                @id @default(uuid()) @db.Uuid
+  userId     String                @db.Uuid @map("user_id")
+  subject    String
+  message    String                @db.Text
+  status     SupportTicketStatus   @default(pending)
+  priority   SupportTicketPriority @default(normal)
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+  resolvedAt DateTime?             @map("resolved_at")
+
+  user       User                  @relation(fields: [userId], references: [id])
+
+  @@map("support_tickets")
 }
 
 model Family {
