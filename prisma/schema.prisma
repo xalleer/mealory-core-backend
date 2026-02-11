@@ -91,6 +91,7 @@ model Family {
   createdBy         User         @relation("FamilyCreatedBy", fields: [createdById], references: [id])
   users             User[]       @relation("FamilyUsers")
   members           FamilyMember[]
+  menus             Menu[]
 
   @@map("families")
 }
@@ -110,6 +111,7 @@ model FamilyMember {
   family       Family   @relation(fields: [familyId], references: [id])
   user         User?    @relation("FamilyMemberUser", fields: [userId], references: [id])
   invitedUsers User[]   @relation("UserFamilyMember")
+  meals        Meal[]
 
   @@map("family_members")
 }
@@ -143,5 +145,106 @@ model Product {
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
+  recipeIngredients  RecipeIngredient[]
+
   @@map("products")
+}
+
+model Menu {
+  id          String   @id @default(uuid()) @db.Uuid
+  familyId    String   @db.Uuid @map("family_id")
+  weekStart   DateTime @db.Date @map("week_start")
+  weekEnd     DateTime @db.Date @map("week_end")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  family      Family   @relation(fields: [familyId], references: [id])
+  days        Day[]
+
+  @@map("menus")
+}
+
+model Day {
+  id        String   @id @default(uuid()) @db.Uuid
+  menuId    String   @db.Uuid @map("menu_id")
+  date      DateTime @db.Date
+  dayNumber Int      @map("day_number")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  meals     Meal[]
+
+  @@map("days")
+}
+
+enum MealType {
+  breakfast
+  lunch
+  snack
+  dinner
+}
+
+enum MealStatus {
+  pending
+  cooking
+  completed
+  skipped
+  auto_skipped
+}
+
+model Meal {
+  id              String     @id @default(uuid()) @db.Uuid
+  dayId           String     @db.Uuid @map("day_id")
+  familyMemberId  String?    @db.Uuid @map("family_member_id")
+  mealType        MealType   @map("meal_type")
+  status          MealStatus @default(pending)
+  scheduledTime   DateTime?  @map("scheduled_time")
+  completedAt     DateTime?  @map("completed_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  day             Day           @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  familyMember    FamilyMember? @relation(fields: [familyMemberId], references: [id])
+  recipe          Recipe?
+
+  @@map("meals")
+}
+
+model Recipe {
+  id            String  @id @default(uuid()) @db.Uuid
+  mealId        String  @unique @db.Uuid @map("meal_id")
+  name          String
+  nameEn        String? @map("name_en")
+  description   String?
+  cookingTime   Int?    @map("cooking_time")
+  servings      Int
+  calories      Int?
+  protein       Decimal? @db.Decimal(6, 2)
+  fats          Decimal? @db.Decimal(6, 2)
+  carbs         Decimal? @db.Decimal(6, 2)
+  instructions  Json
+  imageUrl      String? @map("image_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  meal          Meal               @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  ingredients   RecipeIngredient[]
+
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id         String           @id @default(uuid()) @db.Uuid
+  recipeId   String           @db.Uuid @map("recipe_id")
+  productId  String           @db.Uuid @map("product_id")
+  quantity   Decimal          @db.Decimal(10, 3)
+  unit       MeasurementUnit
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@map("recipe_ingredients")
 }
