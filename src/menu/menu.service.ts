@@ -9,6 +9,7 @@ import type { GenerateMenuDto } from './dto/generate-menu.dto';
 import type { RegenerateMenuDto } from './dto/regenerate-menu.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShoppingListService } from '../shopping-list/shopping-list.service';
+import { InventoryService } from '../inventory/inventory.service';
 import {
   OpenAiService,
   type OpenAiMeal,
@@ -39,6 +40,7 @@ export class MenuService {
     private readonly prisma: PrismaService,
     private readonly openAiService: OpenAiService,
     private readonly shoppingListService: ShoppingListService,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   async generateMenu(userId: string, dto: GenerateMenuDto) {
@@ -271,7 +273,10 @@ export class MenuService {
     const familyId = await this.getUserFamilyId(userId);
     const meal = await this.prisma.meal.findUnique({
       where: { id: mealId },
-      include: { day: { include: { menu: true } } },
+      include: {
+        day: { include: { menu: true } },
+        recipe: { include: { ingredients: true } },
+      },
     });
     if (!meal) {
       throw new NotFoundException('Meal not found');
@@ -284,7 +289,47 @@ export class MenuService {
       throw new BadRequestException('Invalid meal status');
     }
 
-    const completedAt = status === 'completed' ? new Date() : null;
+    if (status === 'completed' && meal.status !== 'completed') {
+      const ingredients = meal.recipe?.ingredients ?? [];
+
+      if (ingredients.length > 0) {
+        try {
+          await this.inventoryService.deductIngredients(
+            familyId,
+            ingredients.map(ing => ({
+              productId: ing.productId,
+              quantity: ing.quantity.toNumber(),
+              unit: ing.unit,
+            })),
+          );
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            const response = error.getResponse();
+            const message =
+              typeof response === 'string'
+                ? response
+                : (response as { message?: unknown }).message;
+
+            if (message === 'Not enough inventory to deduct ingredients') {
+              throw new BadRequestException(
+                'Not enough ingredients in inventory. Please add products first.',
+              );
+            }
+
+            throw error;
+          }
+
+          throw error;
+        }
+      }
+    }
+
+    const completedAt =
+      status === 'completed'
+        ? meal.status === 'completed'
+          ? meal.completedAt
+          : new Date()
+        : null;
 
     return this.prisma.meal.update({
       where: { id: meal.id },

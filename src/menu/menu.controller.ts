@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBadRequestResponse,
   ApiOkResponse,
   ApiTags,
   ApiCreatedResponse,
@@ -91,7 +92,14 @@ export class MenuController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOkResponse({ type: MealResponseDto })
+  @ApiOkResponse({
+    type: MealResponseDto,
+    description:
+      'Meal status updated. If status is "completed", ingredients are deducted from inventory.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Not enough ingredients in inventory or invalid status',
+  })
   @HttpCode(HttpStatus.OK)
   @Patch('meals/:mealId/status')
   async updateMealStatus(
