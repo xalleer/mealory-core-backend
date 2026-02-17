@@ -19,6 +19,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RegisterSuperAdminDto } from './dto/register-super-admin.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
@@ -37,6 +38,12 @@ export class AuthController {
   @Post('register')
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @ApiCreatedResponse({ type: AuthResponseDto })
+  @Post('register-super-admin')
+  async registerSuperAdmin(@Body() dto: RegisterSuperAdminDto) {
+    return this.authService.registerSuperAdmin(dto);
   }
 
   @ApiOkResponse({ type: AuthResponseDto })

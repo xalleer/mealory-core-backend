@@ -9,6 +9,7 @@ import { hash, compare } from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
+import { RegisterSuperAdminDto } from './dto/register-super-admin.dto';
 import { LoginDto } from './dto/login.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
@@ -133,6 +134,60 @@ export class AuthService {
       accessToken,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       needsOnboarding,
+    };
+  }
+
+  async registerSuperAdmin(dto: RegisterSuperAdminDto) {
+    const envSecret = process.env.SUPER_ADMIN_REGISTRATION_SECRET;
+    if (!envSecret) {
+      throw new ForbiddenException(
+        'SUPER_ADMIN_REGISTRATION_SECRET is not set on the server',
+      );
+    }
+
+    if (dto.secret !== envSecret) {
+      throw new ForbiddenException('Invalid super admin registration secret');
+    }
+
+    const existingSuperAdmin = await this.prisma.user.findFirst({
+      where: { role: 'super_admin' },
+      select: { id: true },
+    });
+
+    if (existingSuperAdmin) {
+      throw new ForbiddenException('Super admin already exists');
+    }
+
+    const normalizedEmail = dto.email.toLowerCase();
+    const existing = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existing) {
+      throw new BadRequestException('Email already in use');
+    }
+
+    const passwordHash = await hash(dto.password, 10);
+    if (!passwordHash) {
+      throw new Error('Failed to hash password');
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        password: passwordHash,
+        name: dto.name,
+        authProvider: 'local',
+        isFamilyHead: false,
+        role: 'super_admin',
+      },
+    });
+
+    const accessToken = await this.issueAccessToken(user.id, user.email);
+
+    return {
+      user: this.sanitizeUser(user),
+      accessToken,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
     };
   }
 
