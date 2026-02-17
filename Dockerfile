@@ -14,7 +14,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=prisma-generator /app/node_modules/.prisma ./node_modules/.prisma
-COPY . .
+COPY .. .
 RUN npm run build
 RUN npm prune --omit=dev
 
