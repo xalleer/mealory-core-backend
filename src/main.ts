@@ -3,9 +3,16 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ValidationPipe } from '@nestjs/common';
+ import express from 'express';
+ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', true);
+
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.enableCors({

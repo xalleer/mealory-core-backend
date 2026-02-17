@@ -14,7 +14,14 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from './guards/admin.guard';
 import { AdminService } from './admin.service';
@@ -43,10 +50,66 @@ class PaginationQueryDto {
   limit?: number;
 }
 
+const USER_ROLE_VALUES = ['user', 'admin', 'super_admin'] as const;
+type UserRoleType = (typeof USER_ROLE_VALUES)[number];
+
+const SUBSCRIPTION_TIER_VALUES = ['free', 'pro', 'family_pro'] as const;
+type SubscriptionTierType = (typeof SUBSCRIPTION_TIER_VALUES)[number];
+
+const USER_SORT_BY_VALUES = ['createdAt', 'updatedAt', 'email', 'name'] as const;
+type UserSortByType = (typeof USER_SORT_BY_VALUES)[number];
+
+const SORT_ORDER_VALUES = ['asc', 'desc'] as const;
+type SortOrderType = (typeof SORT_ORDER_VALUES)[number];
+
+const FAMILY_SORT_BY_VALUES = ['createdAt', 'updatedAt'] as const;
+type FamilySortByType = (typeof FAMILY_SORT_BY_VALUES)[number];
+
 class UsersAnalyticsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   period?: string;
+}
+
+class AdminUsersQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsIn(USER_ROLE_VALUES)
+  role?: UserRoleType;
+
+  @IsOptional()
+  @IsIn(SUBSCRIPTION_TIER_VALUES)
+  subscriptionTier?: SubscriptionTierType;
+
+  @IsOptional()
+  @IsIn(USER_SORT_BY_VALUES)
+  sortBy?: UserSortByType;
+
+  @IsOptional()
+  @IsIn(SORT_ORDER_VALUES)
+  sortOrder?: SortOrderType;
+}
+
+class AdminFamiliesQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsIn(FAMILY_SORT_BY_VALUES)
+  sortBy?: FamilySortByType;
+
+  @IsOptional()
+  @IsIn(SORT_ORDER_VALUES)
+  sortOrder?: SortOrderType;
+}
+
+class RecentActivityQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }
 
 class SupportTicketsQueryDto extends PaginationQueryDto {
@@ -70,6 +133,76 @@ export class AdminController {
   @Get('analytics/overview')
   async getAnalyticsOverview() {
     return this.adminService.getAnalyticsOverview();
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        items: { type: 'array', items: { type: 'object' } },
+        total: { type: 'number' },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+      },
+    },
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'role', required: false, enum: USER_ROLE_VALUES })
+  @ApiQuery({
+    name: 'subscriptionTier',
+    required: false,
+    enum: SUBSCRIPTION_TIER_VALUES,
+  })
+  @ApiQuery({ name: 'sortBy', required: false, enum: USER_SORT_BY_VALUES })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: SORT_ORDER_VALUES })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @Get('users')
+  async getUsers(@Query() query: AdminUsersQueryDto) {
+    return this.adminService.getUsers(query);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        items: { type: 'array', items: { type: 'object' } },
+        total: { type: 'number' },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+      },
+    },
+  })
+  @ApiQuery({ name: 'sortBy', required: false, enum: FAMILY_SORT_BY_VALUES })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: SORT_ORDER_VALUES })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @Get('families')
+  async getFamilies(@Query() query: AdminFamiliesQueryDto) {
+    return this.adminService.getFamilies(query);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        users: { type: 'array', items: { type: 'object' } },
+        families: { type: 'array', items: { type: 'object' } },
+        menus: { type: 'array', items: { type: 'object' } },
+        supportTickets: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @Get('activity/recent')
+  async getRecentActivity(@Query() query: RecentActivityQueryDto) {
+    return this.adminService.getRecentActivity(query);
   }
 
   @ApiBearerAuth()

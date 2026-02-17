@@ -12,6 +12,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { AdminModule } from './admin/admin.module';
 import { SupportModule } from './support/support.module';
 import { ProfileModule } from './profile/profile.module';
+import { UploadsModule } from './common/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProfileModule } from './profile/profile.module';
     AdminModule,
     SupportModule,
     ProfileModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

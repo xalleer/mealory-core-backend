@@ -30,6 +30,23 @@ type UsersAnalyticsFilters = Pagination & {
   period?: string;
 };
 
+type UsersListFilters = Pagination & {
+  search?: string;
+  role?: 'user' | 'admin' | 'super_admin';
+  subscriptionTier?: 'free' | 'pro' | 'family_pro';
+  sortBy?: 'createdAt' | 'updatedAt' | 'email' | 'name';
+  sortOrder?: 'asc' | 'desc';
+};
+
+type FamiliesListFilters = Pagination & {
+  sortBy?: 'createdAt' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
+};
+
+type RecentActivityFilters = {
+  limit?: number;
+};
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -206,6 +223,189 @@ export class AdminService {
       total,
       page,
       limit,
+    };
+  }
+
+  async getUsers(filters: UsersListFilters = {}) {
+    const page = filters.page ?? DEFAULT_PAGE;
+    const limit = Math.min(filters.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+
+    if (page < 1 || limit < 1) {
+      throw new BadRequestException('Page and limit must be positive numbers');
+    }
+
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserWhereInput = {
+      ...(filters.role ? { role: filters.role } : {}),
+      ...(filters.subscriptionTier
+        ? { subscriptionTier: filters.subscriptionTier }
+        : {}),
+    };
+
+    if (filters.search) {
+      const q = String(filters.search).trim();
+      if (q.length) {
+        where.OR = [
+          { email: { contains: q, mode: 'insensitive' } },
+          { name: { contains: q, mode: 'insensitive' } },
+        ];
+      }
+    }
+
+    const sortBy = filters.sortBy ?? 'createdAt';
+    const sortOrder = filters.sortOrder ?? 'desc';
+
+    const orderBy: Prisma.UserOrderByWithRelationInput = {
+      [sortBy]: sortOrder,
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          subscriptionTier: true,
+          authProvider: true,
+          familyId: true,
+          isFamilyHead: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getFamilies(filters: FamiliesListFilters = {}) {
+    const page = filters.page ?? DEFAULT_PAGE;
+    const limit = Math.min(filters.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+
+    if (page < 1 || limit < 1) {
+      throw new BadRequestException('Page and limit must be positive numbers');
+    }
+
+    const skip = (page - 1) * limit;
+    const sortBy = filters.sortBy ?? 'createdAt';
+    const sortOrder = filters.sortOrder ?? 'desc';
+
+    const orderBy: Prisma.FamilyOrderByWithRelationInput = {
+      [sortBy]: sortOrder,
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.family.findMany({
+        orderBy,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          weeklyBudget: true,
+          budgetUsed: true,
+          budgetPeriodStart: true,
+          budgetPeriodEnd: true,
+          createdById: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              users: true,
+              members: true,
+              menus: true,
+              shoppingLists: true,
+              inventory: true,
+            },
+          },
+        },
+      }),
+      this.prisma.family.count(),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getRecentActivity(filters: RecentActivityFilters = {}) {
+    const limit = Math.min(filters.limit ?? 20, MAX_LIMIT);
+    if (limit < 1) {
+      throw new BadRequestException('Limit must be a positive number');
+    }
+
+    const [users, families, menus, supportTickets] = await this.prisma
+      .$transaction([
+        this.prisma.user.findMany({
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            subscriptionTier: true,
+            updatedAt: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.family.findMany({
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+          select: {
+            id: true,
+            createdById: true,
+            updatedAt: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.menu.findMany({
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+          select: {
+            id: true,
+            familyId: true,
+            weekStart: true,
+            weekEnd: true,
+            isActive: true,
+            updatedAt: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.supportTicket.findMany({
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+          select: {
+            id: true,
+            userId: true,
+            subject: true,
+            status: true,
+            priority: true,
+            updatedAt: true,
+            createdAt: true,
+          },
+        }),
+      ]);
+
+    return {
+      users,
+      families,
+      menus,
+      supportTickets,
     };
   }
 

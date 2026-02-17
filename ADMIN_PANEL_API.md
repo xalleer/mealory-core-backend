@@ -146,7 +146,129 @@ Authorization: Bearer <admin_token>
 - `limit?: number` - кількість записів (default: 10)
 - `period?: string` - період (напр. '7d', '30d', '90d')
 
-## 2.3 Support Tickets - список
+## 2.3 Користувачі - список
+```
+GET /admin/users?page=1&limit=20&search=john&role=user&subscriptionTier=pro&sortBy=createdAt&sortOrder=desc
+Authorization: Bearer <admin_token>
+```
+
+**Query Parameters:**
+- `page?: number` - номер сторінки (default: 1)
+- `limit?: number` - кількість записів (default: 20)
+- `search?: string` - пошук по `email` або `name`
+- `role?: 'user' | 'admin' | 'super_admin'`
+- `subscriptionTier?: 'free' | 'pro' | 'family_pro'`
+- `sortBy?: 'createdAt' | 'updatedAt' | 'email' | 'name'` (default: `createdAt`)
+- `sortOrder?: 'asc' | 'desc'` (default: `desc`)
+
+**Response:**
+```typescript
+{
+  items: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: 'user' | 'admin' | 'super_admin';
+    subscriptionTier: 'free' | 'pro' | 'family_pro';
+    authProvider: 'local' | 'google' | 'apple';
+    familyId?: string;
+    isFamilyHead: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  total: number;
+  page: number;
+  limit: number;
+}
+```
+
+## 2.4 Сім'ї - список
+```
+GET /admin/families?page=1&limit=20&sortBy=createdAt&sortOrder=desc
+Authorization: Bearer <admin_token>
+```
+
+**Query Parameters:**
+- `page?: number` - номер сторінки (default: 1)
+- `limit?: number` - кількість записів (default: 20)
+- `sortBy?: 'createdAt' | 'updatedAt'` (default: `createdAt`)
+- `sortOrder?: 'asc' | 'desc'` (default: `desc`)
+
+**Response:**
+```typescript
+{
+  items: Array<{
+    id: string;
+    weeklyBudget?: number;
+    budgetUsed: number;
+    budgetPeriodStart?: Date;
+    budgetPeriodEnd?: Date;
+    createdById: string;
+    createdAt: Date;
+    updatedAt: Date;
+    _count: {
+      users: number;
+      members: number;
+      menus: number;
+      shoppingLists: number;
+      inventory: number;
+    };
+  }>;
+  total: number;
+  page: number;
+  limit: number;
+}
+```
+
+## 2.5 Остання активність
+```
+GET /admin/activity/recent?limit=20
+Authorization: Bearer <admin_token>
+```
+
+**Query Parameters:**
+- `limit?: number` - кількість записів в кожній категорії (default: 20, max: 100)
+
+**Response:**
+```typescript
+{
+  users: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: 'user' | 'admin' | 'super_admin';
+    subscriptionTier: 'free' | 'pro' | 'family_pro';
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  families: Array<{
+    id: string;
+    createdById: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  menus: Array<{
+    id: string;
+    familyId: string;
+    weekStart: Date;
+    weekEnd: Date;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  supportTickets: Array<{
+    id: string;
+    userId: string;
+    subject: string;
+    status: 'pending' | 'in_progress' | 'resolved' | 'closed';
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+}
+```
+
+## 2.6 Support Tickets - список
 ```
 GET /admin/support/tickets?page=1&limit=10&status=pending&priority=high
 Authorization: Bearer <admin_token>
@@ -178,13 +300,13 @@ Authorization: Bearer <admin_token>
 }
 ```
 
-## 2.4 Support Ticket - деталі
+## 2.7 Support Ticket - деталі
 ```
 GET /admin/support/tickets/:id
 Authorization: Bearer <admin_token>
 ```
 
-## 2.5 Оновлення статусу тікету
+## 2.8 Оновлення статусу тікету
 ```
 PATCH /admin/support/tickets/:id/status
 Authorization: Bearer <admin_token>
