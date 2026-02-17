@@ -139,7 +139,17 @@ export class ShoppingListService {
       }
 
       const averagePrice = requirement.product.averagePrice.toNumber();
-      const estimatedPrice = needed * averagePrice;
+      const standardPackaging = requirement.product.standardPackaging
+        ? requirement.product.standardPackaging.toNumber()
+        : null;
+
+      const estimatedPrice =
+        standardPackaging != null &&
+        standardPackaging > 0 &&
+        requirement.unit === requirement.product.baseUnit &&
+        requirement.product.baseUnit !== 'piece'
+          ? (needed / standardPackaging) * averagePrice
+          : needed * averagePrice;
       totalPrice += estimatedPrice;
 
       itemsData.push({
