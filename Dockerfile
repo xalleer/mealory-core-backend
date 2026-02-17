@@ -33,6 +33,10 @@ COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/prisma ./prisma
 COPY docker-entrypoint.sh /usr/local/bin/
 
+RUN mkdir -p /app/uploads/products/temp /app/uploads/avatars/temp
+
+VOLUME ["/app/uploads"]
+
 EXPOSE 3000
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=10 \
