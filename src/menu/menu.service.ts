@@ -215,7 +215,8 @@ export class MenuService {
     return (
       message.includes('OpenAI response missing meal') ||
       message.includes('OpenAI response missing meals') ||
-      message.includes('OpenAI must return exactly')
+      message.includes('OpenAI must return exactly') ||
+      message.includes('OpenAI must return 7 days')
     );
   }
 
