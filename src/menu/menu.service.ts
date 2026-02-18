@@ -187,14 +187,23 @@ export class MenuService {
       });
     };
 
-    try {
-      return await attempt();
-    } catch (err) {
-      if (!this.isRetryableOpenAiMenuValidationError(err)) {
-        throw err;
+    const maxAttempts = 3;
+    let lastError: unknown;
+    for (let attemptNo = 1; attemptNo <= maxAttempts; attemptNo++) {
+      try {
+        return await attempt();
+      } catch (err) {
+        lastError = err;
+        if (!this.isRetryableOpenAiMenuValidationError(err)) {
+          throw err;
+        }
+        if (attemptNo === maxAttempts) {
+          throw err;
+        }
       }
-      return attempt();
     }
+
+    throw lastError;
   }
 
   private isRetryableOpenAiMenuValidationError(err: unknown) {
