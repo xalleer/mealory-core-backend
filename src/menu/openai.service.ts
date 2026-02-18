@@ -200,6 +200,29 @@ export class OpenAiService {
         ? `Weekly budget limit: ${params.weeklyBudget}`
         : 'Weekly budget: unlimited';
 
+    const expectedMealsPerMember = params.members
+      .map(member => {
+        const mealTimes = Array.isArray(member.mealTimes)
+          ? (member.mealTimes as unknown[])
+          : [];
+        const normalizedMealTypes = mealTimes.filter((t): t is MealTypeType =>
+          ['breakfast', 'lunch', 'snack', 'dinner'].includes(String(t)),
+        );
+        const requiredMealTypes: MealTypeType[] =
+          normalizedMealTypes.length > 0
+            ? normalizedMealTypes
+            : member.isRegistered
+              ? ['breakfast', 'lunch', 'snack', 'dinner']
+              : [];
+
+        return {
+          familyMemberId: member.id,
+          isRegistered: member.isRegistered,
+          requiredMealTypes,
+        };
+      })
+      .filter(m => m.requiredMealTypes.length > 0);
+
     return [
       'Ти — двигун генерації меню. Поверни тільки валідний JSON без markdown.',
       'Згенеруй меню на 7 днів для сім’ї, використовуючи ТІЛЬКИ список наданих продуктів.',
@@ -211,6 +234,8 @@ export class OpenAiService {
       '- Якщо mealTimes — непорожній масив, згенеруй рівно ці mealType для цього familyMemberId.',
       '- Якщо isRegistered=true і mealTimes відсутній/порожній, згенеруй 4 mealType: breakfast, lunch, snack, dinner.',
       '- Якщо isRegistered=false і mealTimes відсутній/порожній, НЕ генеруй meals для цього familyMemberId.',
+      'ОБОВ’ЯЗКОВО: не пропускай жодного required mealType. Якщо для required mealType важко підібрати рецепт, все одно поверни meal з recipe, який використовує доступні продукти і вкладається в бюджет.',
+      `Expected meals per member: ${JSON.stringify(expectedMealsPerMember)}.`,
       'Для кожного meal заповнюй recipe (не null).',
       'Використовуй тільки productId зі списку продуктів. Не вигадуй нових продуктів.',
       'Поле instructions ОБОВ’ЯЗКОВЕ: масив рядків (кроки), мінімум 3 кроки, не порожній.',
@@ -250,6 +275,29 @@ export class OpenAiService {
         ? `Weekly budget limit: ${params.weeklyBudget}`
         : 'Weekly budget: unlimited';
 
+    const expectedMealsPerMember = params.members
+      .map(member => {
+        const mealTimes = Array.isArray(member.mealTimes)
+          ? (member.mealTimes as unknown[])
+          : [];
+        const normalizedMealTypes = mealTimes.filter((t): t is MealTypeType =>
+          ['breakfast', 'lunch', 'snack', 'dinner'].includes(String(t)),
+        );
+        const requiredMealTypes: MealTypeType[] =
+          normalizedMealTypes.length > 0
+            ? normalizedMealTypes
+            : member.isRegistered
+              ? ['breakfast', 'lunch', 'snack', 'dinner']
+              : [];
+
+        return {
+          familyMemberId: member.id,
+          isRegistered: member.isRegistered,
+          requiredMealTypes,
+        };
+      })
+      .filter(m => m.requiredMealTypes.length > 0);
+
     return [
       'Ти — двигун генерації меню. Поверни тільки валідний JSON без markdown.',
       'Перегенеруй меню для ОДНОГО дня, використовуючи ТІЛЬКИ надані продукти.',
@@ -259,6 +307,8 @@ export class OpenAiService {
       '- Якщо mealTimes — непорожній масив, згенеруй рівно ці mealType для цього familyMemberId.',
       '- Якщо isRegistered=true і mealTimes відсутній/порожній, згенеруй 4 mealType: breakfast, lunch, snack, dinner.',
       '- Якщо isRegistered=false і mealTimes відсутній/порожній, НЕ генеруй meals для цього familyMemberId.',
+      'ОБОВ’ЯЗКОВО: не пропускай жодного required mealType.',
+      `Expected meals per member: ${JSON.stringify(expectedMealsPerMember)}.`,
       'Для кожного meal заповнюй recipe (не null).',
       'Використовуй тільки productId зі списку продуктів. Не вигадуй нових продуктів.',
       'Поле instructions ОБОВ’ЯЗКОВЕ: масив рядків (кроки), мінімум 3 кроки, не порожній.',

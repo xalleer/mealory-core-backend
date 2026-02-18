@@ -432,8 +432,14 @@ export class MenuService {
       id: member.id,
       name: member.name,
       isRegistered: member.isRegistered,
-      mealTimes: member.mealTimes,
-      allergies: member.allergies,
+      mealTimes: Array.isArray(member.mealTimes)
+        ? (member.mealTimes as unknown[]).filter(t =>
+            MEAL_TYPE_VALUES.includes(t as MealTypeType),
+          )
+        : [],
+      allergies: Array.isArray(member.allergies)
+        ? (member.allergies as unknown[]).filter(a => typeof a === 'string')
+        : [],
       goal: (member.user?.goal as OpenAiMemberProfile['goal']) ?? null,
     }));
 
