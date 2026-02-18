@@ -400,6 +400,7 @@ export class MenuService {
     members: Array<{
       id: string;
       name: string;
+      isRegistered: boolean;
       mealTimes: unknown;
       allergies: unknown;
       user: { goal: string | null } | null;
@@ -416,6 +417,10 @@ export class MenuService {
       category: product.category,
       averagePrice: product.averagePrice.toNumber(),
       baseUnit: product.baseUnit,
+      standardPackaging:
+        product.standardPackaging != null
+          ? product.standardPackaging.toNumber()
+          : null,
       calories: product.calories ?? null,
       protein: product.protein ? product.protein.toNumber() : null,
       fats: product.fats ? product.fats.toNumber() : null,
@@ -426,6 +431,7 @@ export class MenuService {
     const members: OpenAiMemberProfile[] = family.members.map(member => ({
       id: member.id,
       name: member.name,
+      isRegistered: member.isRegistered,
       mealTimes: member.mealTimes,
       allergies: member.allergies,
       goal: (member.user?.goal as OpenAiMemberProfile['goal']) ?? null,
@@ -493,6 +499,8 @@ export class MenuService {
 
     const dayDate = this.getDayDate(params.weekStart, params.day.dayNumber);
 
+    this.validateDayMeals(params.day.meals, params.members);
+
     return {
       dayNumber: params.day.dayNumber,
       date: dayDate,
@@ -536,6 +544,7 @@ export class MenuService {
       };
 
       if (meal.recipe) {
+        this.validateRecipeInstructions(meal.recipe.instructions);
         mealData.recipe = {
           create: this.buildRecipeCreateData(meal.recipe, productIds),
         };
@@ -616,6 +625,69 @@ export class MenuService {
       if (!productIds.has(ingredient.productId)) {
         throw new BadRequestException('Invalid product in recipe');
       }
+    }
+  }
+
+  private validateDayMeals(
+    meals: OpenAiMeal[] | unknown,
+    members: OpenAiMemberProfile[],
+  ) {
+    if (!Array.isArray(meals)) {
+      throw new BadRequestException('OpenAI response missing meals');
+    }
+
+    const expected: Array<{ familyMemberId: string; mealType: MealTypeType }> =
+      [];
+
+    for (const member of members) {
+      const mealTimes = Array.isArray(member.mealTimes)
+        ? (member.mealTimes as unknown[])
+        : [];
+      const normalizedMealTypes = mealTimes.filter((t): t is MealTypeType =>
+        MEAL_TYPE_VALUES.includes(t as MealTypeType),
+      );
+
+      const requiredMealTypes: MealTypeType[] =
+        normalizedMealTypes.length > 0
+          ? normalizedMealTypes
+          : member.isRegistered
+            ? [...MEAL_TYPE_VALUES]
+            : [];
+
+      for (const mealType of requiredMealTypes) {
+        expected.push({ familyMemberId: member.id, mealType });
+      }
+    }
+
+    for (const item of expected) {
+      const hasMeal = meals.some(
+        m => m.familyMemberId === item.familyMemberId && m.mealType === item.mealType,
+      );
+      if (!hasMeal) {
+        throw new BadRequestException(
+          `OpenAI response missing meal: member=${item.familyMemberId} mealType=${item.mealType}`,
+        );
+      }
+    }
+
+    if (meals.length !== expected.length) {
+      throw new BadRequestException(
+        `OpenAI must return exactly ${expected.length} meals per day (got ${meals.length})`,
+      );
+    }
+  }
+
+  private validateRecipeInstructions(instructions: unknown) {
+    if (!Array.isArray(instructions)) {
+      throw new BadRequestException('Recipe instructions must be an array');
+    }
+
+    const steps = instructions.filter(
+      step => typeof step === 'string' && step.trim().length > 0,
+    );
+
+    if (steps.length < 3) {
+      throw new BadRequestException('Recipe instructions must have at least 3 steps');
     }
   }
 

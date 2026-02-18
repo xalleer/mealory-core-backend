@@ -10,6 +10,7 @@ import type { MealTypeType } from './menu.types';
 export type OpenAiMemberProfile = {
   id: string;
   name: string;
+  isRegistered: boolean;
   mealTimes: unknown;
   allergies: unknown;
   goal: GoalType | null;
@@ -22,6 +23,7 @@ export type OpenAiProduct = {
   category: string;
   averagePrice: number;
   baseUnit: MeasurementUnitType;
+  standardPackaging: number | null;
   calories: number | null;
   protein: number | null;
   fats: number | null;
@@ -199,17 +201,34 @@ export class OpenAiService {
         : 'Weekly budget: unlimited';
 
     return [
-      'Generate a 7-day menu for the family using ONLY the provided products list.',
-      'If members have different goals, provide tailored meals per member.',
-      'Return exactly 7 days (dayNumber 1-7).',
-      'Each day must include meals for each family member and each meal type they should eat.',
-      'Use productId from the product list. Do not invent products.',
+      'Ти — двигун генерації меню. Поверни тільки валідний JSON без markdown.',
+      'Згенеруй меню на 7 днів для сім’ї, використовуючи ТІЛЬКИ список наданих продуктів.',
+      'Всі користувацькі тексти мають бути українською: назви рецептів, описи, кроки приготування.',
+      'Якщо у члена сім’ї є goal (зазвичай це зареєстрований користувач), адаптуй рецепти під цю ціль.',
+      'Поверни рівно 7 днів (dayNumber 1-7).',
+      'Кожен день має містити meals для кожного члена сім’ї згідно його mealTimes.',
+      'Правило для mealTimes:',
+      '- Якщо mealTimes — непорожній масив, згенеруй рівно ці mealType для цього familyMemberId.',
+      '- Якщо isRegistered=true і mealTimes відсутній/порожній, згенеруй 4 mealType: breakfast, lunch, snack, dinner.',
+      '- Якщо isRegistered=false і mealTimes відсутній/порожній, НЕ генеруй meals для цього familyMemberId.',
+      'Для кожного meal заповнюй recipe (не null).',
+      'Використовуй тільки productId зі списку продуктів. Не вигадуй нових продуктів.',
+      'Поле instructions ОБОВ’ЯЗКОВЕ: масив рядків (кроки), мінімум 3 кроки, не порожній.',
+      'БЮДЖЕТ ОБОВ’ЯЗКОВИЙ: якщо Weekly budget limit заданий (не unlimited), меню має вкладатися в бюджет.',
+      'Ціноутворення продуктів:',
+      '- averagePrice — це ціна за СТАНДАРТНУ упаковку продукту.',
+      '- standardPackaging — розмір стандартної упаковки в baseUnit (наприклад 1000 g, 1 l, 10 pcs). Може бути null.',
+      'Як оцінювати вартість інгредієнтів для бюджету:',
+      '- Для кожного productId сумуй загальну кількість (quantity) по всьому меню.',
+      '- Якщо standardPackaging відомий і > 0: packagesNeeded = ceil(totalQuantity / standardPackaging). cost = packagesNeeded * averagePrice.',
+      '- Якщо standardPackaging відсутній/null: вважай 1 упаковку на кожен унікальний productId, який використовується в меню. cost += averagePrice.',
+      'Підбери рецепти і кількості так, щоб сумарна оцінка cost не перевищувала weeklyBudget.',
       `${budgetText}.`,
       params.regenerationReason
         ? `Regeneration reason: ${params.regenerationReason}.`
         : null,
-      'Output JSON in this schema:',
-      '{"menu":{"days":[{"dayNumber":1,"meals":[{"familyMemberId":"uuid","mealType":"breakfast","recipe":{"name":"","nameEn":null,"description":null,"cookingTime":30,"servings":1,"calories":300,"protein":20,"fats":10,"carbs":40,"instructions":[],"imageUrl":null,"ingredients":[{"productId":"uuid","quantity":100,"unit":"g"}]}}]}]}}',
+      'Поверни JSON за схемою (приклад):',
+      '{"menu":{"days":[{"dayNumber":1,"meals":[{"familyMemberId":"uuid","mealType":"breakfast","recipe":{"name":"","nameEn":null,"description":null,"cookingTime":30,"servings":1,"calories":300,"protein":20,"fats":10,"carbs":40,"instructions":["Крок 1","Крок 2","Крок 3"],"imageUrl":null,"ingredients":[{"productId":"uuid","quantity":100,"unit":"g"}]}}]}]}}',
       `Week start: ${params.weekStart.toISOString().slice(0, 10)}; Week end: ${params.weekEnd.toISOString().slice(0, 10)}.`,
       `Family members JSON: ${JSON.stringify(params.members)}.`,
       `Products JSON: ${JSON.stringify(params.products)}.`,
@@ -232,14 +251,23 @@ export class OpenAiService {
         : 'Weekly budget: unlimited';
 
     return [
-      'Regenerate menu for a single day using ONLY provided products.',
-      'Return meals for the day for each family member and meal type.',
-      'Use productId from the product list. Do not invent products.',
+      'Ти — двигун генерації меню. Поверни тільки валідний JSON без markdown.',
+      'Перегенеруй меню для ОДНОГО дня, використовуючи ТІЛЬКИ надані продукти.',
+      'Всі користувацькі тексти мають бути українською: назви рецептів, описи, кроки приготування.',
+      'Поверни страви на день для КОЖНОГО члена сім’ї згідно його mealTimes (див. правило нижче).',
+      'Правило для mealTimes:',
+      '- Якщо mealTimes — непорожній масив, згенеруй рівно ці mealType для цього familyMemberId.',
+      '- Якщо isRegistered=true і mealTimes відсутній/порожній, згенеруй 4 mealType: breakfast, lunch, snack, dinner.',
+      '- Якщо isRegistered=false і mealTimes відсутній/порожній, НЕ генеруй meals для цього familyMemberId.',
+      'Для кожного meal заповнюй recipe (не null).',
+      'Використовуй тільки productId зі списку продуктів. Не вигадуй нових продуктів.',
+      'Поле instructions ОБОВ’ЯЗКОВЕ: масив рядків (кроки), мінімум 3 кроки, не порожній.',
+      'БЮДЖЕТ ОБОВ’ЯЗКОВИЙ: якщо Weekly budget limit заданий (не unlimited), підбирай рецепти/порції так, щоб не перевищити бюджет (ціна за стандартну упаковку).',
       `${budgetText}.`,
       `Reason: ${params.reason}.`,
       `Day number: ${params.dayNumber}. Date: ${params.date.toISOString().slice(0, 10)}.`,
-      'Output JSON in this schema:',
-      '{"day":{"meals":[{"familyMemberId":"uuid","mealType":"breakfast","recipe":{"name":"","nameEn":null,"description":null,"cookingTime":30,"servings":1,"calories":300,"protein":20,"fats":10,"carbs":40,"instructions":[],"imageUrl":null,"ingredients":[{"productId":"uuid","quantity":100,"unit":"g"}]}}]}}',
+      'Поверни JSON за схемою (приклад):',
+      '{"day":{"meals":[{"familyMemberId":"uuid","mealType":"breakfast","recipe":{"name":"","nameEn":null,"description":null,"cookingTime":30,"servings":1,"calories":300,"protein":20,"fats":10,"carbs":40,"instructions":["Крок 1","Крок 2","Крок 3"],"imageUrl":null,"ingredients":[{"productId":"uuid","quantity":100,"unit":"g"}]}}]}}',
       `Family members JSON: ${JSON.stringify(params.members)}.`,
       `Products JSON: ${JSON.stringify(params.products)}.`,
     ]
@@ -263,15 +291,17 @@ export class OpenAiService {
         : 'Weekly budget: unlimited';
 
     return [
-      'Regenerate a single meal recipe using ONLY provided products.',
-      'Return only the recipe object for the meal type and member.',
-      'Use productId from the product list. Do not invent products.',
+      'Ти — двигун генерації рецептів. Поверни тільки валідний JSON без markdown.',
+      'Перегенеруй ОДИН рецепт для конкретного прийому їжі, використовуючи ТІЛЬКИ надані продукти.',
+      'Всі користувацькі тексти мають бути українською: назва, опис, кроки приготування.',
+      'Поле instructions ОБОВ’ЯЗКОВЕ: масив рядків (кроки), мінімум 3 кроки, не порожній.',
+      'Використовуй тільки productId зі списку продуктів. Не вигадуй нових продуктів.',
       `${budgetText}.`,
       `Reason: ${params.reason}.`,
       `Day number: ${params.dayNumber}. Date: ${params.date.toISOString().slice(0, 10)}.`,
       `Meal type: ${params.mealType}. Family member: ${params.familyMemberId ?? 'null'}.`,
-      'Output JSON in this schema:',
-      '{"meal":{"recipe":{"name":"","nameEn":null,"description":null,"cookingTime":30,"servings":1,"calories":300,"protein":20,"fats":10,"carbs":40,"instructions":[],"imageUrl":null,"ingredients":[{"productId":"uuid","quantity":100,"unit":"g"}]}}}',
+      'Поверни JSON за схемою (приклад):',
+      '{"meal":{"recipe":{"name":"","nameEn":null,"description":null,"cookingTime":30,"servings":1,"calories":300,"protein":20,"fats":10,"carbs":40,"instructions":["Крок 1","Крок 2","Крок 3"],"imageUrl":null,"ingredients":[{"productId":"uuid","quantity":100,"unit":"g"}]}}}',
       `Family members JSON: ${JSON.stringify(params.members)}.`,
       `Products JSON: ${JSON.stringify(params.products)}.`,
     ]
