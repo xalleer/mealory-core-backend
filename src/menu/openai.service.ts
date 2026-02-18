@@ -206,7 +206,9 @@ export class OpenAiService {
           ? (member.mealTimes as unknown[])
           : [];
         const normalizedMealTypes = mealTimes.filter((t): t is MealTypeType =>
-          ['breakfast', 'lunch', 'snack', 'dinner'].includes(String(t)),
+          ['breakfast', 'lunch', 'snack', 'dinner'].includes(
+            String(t).toLowerCase(),
+          ),
         );
         const requiredMealTypes: MealTypeType[] =
           normalizedMealTypes.length > 0
@@ -283,7 +285,9 @@ export class OpenAiService {
           ? (member.mealTimes as unknown[])
           : [];
         const normalizedMealTypes = mealTimes.filter((t): t is MealTypeType =>
-          ['breakfast', 'lunch', 'snack', 'dinner'].includes(String(t)),
+          ['breakfast', 'lunch', 'snack', 'dinner'].includes(
+            String(t).toLowerCase(),
+          ),
         );
         const requiredMealTypes: MealTypeType[] =
           normalizedMealTypes.length > 0

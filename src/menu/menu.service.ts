@@ -72,15 +72,13 @@ export class MenuService {
       menuParams.regenerationReason = dto.regenerationReason;
     }
 
-    const aiResponse = await this.openAiService.generateMenu(menuParams);
-
-    const createData = this.buildMenuCreateData({
+    const createData = await this.generateMenuCreateDataWithRetry({
       familyId: family.id,
       weekStart,
       weekEnd,
-      menuResponse: aiResponse,
       members,
       products,
+      menuParams,
     });
 
     const menu = await this.prisma.$transaction(async tx => {
@@ -113,21 +111,25 @@ export class MenuService {
     const family = await this.getFamily(menu.familyId);
     const { members, products } = await this.getOpenAiContext(family);
 
-    const aiResponse = await this.openAiService.generateMenu({
+    const menuParams = {
       weekStart: menu.weekStart,
       weekEnd: menu.weekEnd,
       weeklyBudget: family.weeklyBudget,
       regenerationReason: dto.reason,
       members,
       products,
-    });
+    };
 
-    const daysData = this.buildDaysCreateData({
+    const createData = await this.generateMenuCreateDataWithRetry({
+      familyId: menu.familyId,
       weekStart: menu.weekStart,
-      menuResponse: aiResponse,
+      weekEnd: menu.weekEnd,
       members,
       products,
+      menuParams,
     });
+
+    const daysData = this.getDaysCreateData(createData);
 
     return this.prisma.menu.update({
       where: { id: menu.id },
@@ -139,6 +141,82 @@ export class MenuService {
       },
       include: this.menuInclude,
     });
+  }
+
+  private getDaysCreateData(createData: Prisma.MenuCreateInput) {
+    const days = createData.days as unknown;
+    if (!days || typeof days !== 'object') {
+      throw new BadRequestException('OpenAI response missing days');
+    }
+
+    const daysCreate = (days as { create?: unknown }).create;
+    if (!daysCreate) {
+      throw new BadRequestException('OpenAI response missing days');
+    }
+
+    return daysCreate as Exclude<
+      Exclude<Prisma.MenuCreateInput['days'], undefined>['create'],
+      undefined
+    >;
+  }
+
+  private async generateMenuCreateDataWithRetry(params: {
+    familyId: string;
+    weekStart: Date;
+    weekEnd: Date;
+    members: OpenAiMemberProfile[];
+    products: OpenAiProduct[];
+    menuParams: {
+      weekStart: Date;
+      weekEnd: Date;
+      weeklyBudget: number | null;
+      members: OpenAiMemberProfile[];
+      products: OpenAiProduct[];
+      regenerationReason?: string;
+    };
+  }) {
+    const attempt = async () => {
+      const aiResponse = await this.openAiService.generateMenu(params.menuParams);
+      return this.buildMenuCreateData({
+        familyId: params.familyId,
+        weekStart: params.weekStart,
+        weekEnd: params.weekEnd,
+        menuResponse: aiResponse,
+        members: params.members,
+        products: params.products,
+      });
+    };
+
+    try {
+      return await attempt();
+    } catch (err) {
+      if (!this.isRetryableOpenAiMenuValidationError(err)) {
+        throw err;
+      }
+      return attempt();
+    }
+  }
+
+  private isRetryableOpenAiMenuValidationError(err: unknown) {
+    if (!(err instanceof BadRequestException)) {
+      return false;
+    }
+
+    const response = err.getResponse();
+    const message =
+      typeof response === 'string'
+        ? response
+        : typeof (response as { message?: unknown }).message === 'string'
+          ? ((response as { message?: unknown }).message as string)
+          : Array.isArray((response as { message?: unknown }).message)
+            ? String((response as { message?: unknown }).message?.[0] ?? '')
+            : '';
+
+    return (
+      message.includes('OpenAI response missing meal') ||
+      message.includes('OpenAI response missing meals') ||
+      message.includes('OpenAI must return exactly')
+    );
   }
 
   async regenerateDay(userId: string, dayId: string, dto: RegenerateMenuDto) {
@@ -652,7 +730,7 @@ export class MenuService {
         ? (member.mealTimes as unknown[])
         : [];
       const normalizedMealTypes = mealTimes.filter((t): t is MealTypeType =>
-        MEAL_TYPE_VALUES.includes(t as MealTypeType),
+        MEAL_TYPE_VALUES.includes(String(t).toLowerCase() as MealTypeType),
       );
 
       const requiredMealTypes: MealTypeType[] =
