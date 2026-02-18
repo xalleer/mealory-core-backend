@@ -629,7 +629,9 @@ export class MenuService {
 
     for (const ingredient of recipe.ingredients) {
       if (!productIds.has(ingredient.productId)) {
-        throw new BadRequestException('Invalid product in recipe');
+        throw new BadRequestException(
+          `Invalid productId in recipe ingredients: ${ingredient.productId}`,
+        );
       }
     }
   }
